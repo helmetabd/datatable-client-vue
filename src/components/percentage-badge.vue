@@ -2,7 +2,7 @@
 import { defineProps } from 'vue'
 defineProps({
   label: {
-    type: String || Number
+    type: [String, Number]
   },
   status: {
     type: String

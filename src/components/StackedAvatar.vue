@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { getAvatar } from '../utils/assetsHelper'
-import { defineProps } from 'vue'
+import { defineProps, inject } from 'vue'
 defineProps(['collections', 'link', 'route', 'collectionTitle'])
-const avatar = (avatar: string | string[]) => getAvatar(avatar)
+const url = inject('asset_url') as string
+const avatar = (avatar: string | string[]) => getAvatar(avatar, url)
 </script>
 <template>
   <div class="d-flex align-items-center w-2">

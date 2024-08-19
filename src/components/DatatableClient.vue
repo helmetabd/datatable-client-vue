@@ -11,6 +11,9 @@
   vertical-align: middle;
 }
 </style>
+<style lang="scss">
+@import '../assets/scss/config/default/app.scss';
+</style>
 <script setup lang="ts">
 import { reactive, computed, onMounted, ref, withDefaults, inject } from 'vue'
 import * as XLSX from 'xlsx'
@@ -306,12 +309,128 @@ const toggleCollapsed = (id: string | number) => {
 const tableData = ref<HTMLElement | null>(null)
 const copyInfo = ref<HTMLElement | null>(null)
 
-const exportToExcel = () => {
-  if (tableData.value) {
-    const ws = XLSX.utils.table_to_sheet(tableData.value)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
-    XLSX.writeFile(wb, `${props.copyTitle ?? 'Report'}.xlsx`)
+const renderCellContent = (item: any, column: Column) => {
+  if (column.isNumber) {
+    const value = getObjectValue(item, column.name)
+    const formattedValue = column.fixedNumber
+      ? value?.toFixed(column.fixedNumber).replace('.', ',')
+      : thousandSeparator(value)
+    return column.currency ? `${column.currency} ${formattedValue}` : formattedValue
+  } else if (column.percentage) {
+    const growth = calculateGrowth(
+      getObjectValue(item, column.percentage.target),
+      getObjectValue(item, column.percentage.actual)
+    )
+    return {
+      component: 'PercentageBadge',
+      props: {
+        label: growth.result,
+        status: growth.success
+      }
+    }
+  } else if (column.custom) {
+    if (column.custom.routeName) {
+      return {
+        component: 'router-link',
+        props: {
+          to: {
+            name: column.custom.routeName,
+            params: {
+              id: column.isFirst
+                ? getObjectValue(item[column.name][0], column.custom.params)
+                : column.isLast
+                  ? getObjectValue(
+                      item[column.name][item[column.name].length - 1],
+                      column.custom.params
+                    )
+                  : getObjectValue(item, column.custom.params)
+            }
+          }
+        },
+        text: getObjectValue(item, column.name)
+      }
+    } else if (column.custom.image) {
+      return {
+        imageSrc: avatar(getObjectValue(item, column.custom.image)),
+        text: getObjectValue(item, column.name)
+      }
+    } else {
+      return {
+        iconClass: column.custom.icon,
+        text: getObjectValue(item, column.name)
+      }
+    }
+  } else if (column.badge) {
+    const value = getObjectValue(item, column.name)
+    const badges = column.badge.types
+      ? column.badge.types.map((model: any) => ({
+          condition: model.value === value,
+          class: column.badge.custom
+            ? `badge text-${model.textColor}`
+            : `badge bg-${model.type}-subtle text-${model.type} p-2`,
+          style: column.badge.custom ? `background-color: ${model.color};` : undefined,
+          text: model.label || value
+        }))
+      : [
+          {
+            condition: true,
+            class: column.badge.custom
+              ? `badge text-${column.badge.textColor}`
+              : `badge bg-${column.badge.type}-subtle text-${column.badge.type} p-2`,
+            style: column.badge.custom
+              ? `background-color: ${getObjectValue(item, column.badge.color)};`
+              : undefined,
+            text: value
+          }
+        ]
+    return badges
+  } else if (column.dateConfig) {
+    const formattedDate = formatDate(
+      item[column.name],
+      column.dateConfig.before,
+      column.dateConfig.after
+    )
+    if (column.routeName) {
+      return {
+        component: 'router-link',
+        props: {
+          to: {
+            name: column.routeName,
+            params: { id: getObjectValue(item, column.params.id) },
+            query: { date: getObjectValue(item, column.params.date) }
+          }
+        },
+        text: formattedDate
+      }
+    }
+    return formattedDate
+  } else if (column.offcanvas) {
+    return {
+      buttonText: item[column.name],
+      onClick: () =>
+        openOffcanvas({
+          courier: getObjectValue(item, column.offcanvas.courier),
+          tracking_number: item[column.name]
+        })
+    }
+  } else if (column.stackedImage) {
+    return {
+      component: 'StackedAvatar',
+      props: { collections: item[column.name] }
+    }
+  } else if (column.isArray) {
+    return column.isFirst
+      ? getObjectValue(item[column.name][0], column.display)
+      : column.isLast
+        ? getObjectValue(item[column.name][item[column.name].length - 1], column.display)
+        : formatObjectArray(item[column.name], column.display)
+  } else if (column.defaultValue) {
+    return getObjectValue(item, column.name, column.defaultValue)
+  } else if (column.customizeRow) {
+    // Customization handled by the slot in the template
+    return null
+  } else {
+    return getObjectValue(item, column.name)
   }
 }
 
@@ -338,21 +457,185 @@ const copyToClipboard = () => {
   }
 }
 
-const printTable = () => {
-  if (tableData.value) {
-    const printWindow = window.open('about:blank', '_blank')
-    if (printWindow) {
-      printWindow.document.write(
-        `<html><head><title>${props.copyTitle ?? 'Print'}</title></head><body>`
-      )
-      printWindow.document.write(`<h3>${props.copyTitle ?? 'Print'}</h3>`)
-      printWindow.document.write(tableData.value.outerHTML)
-      printWindow.document.write('</body></html>')
-      printWindow.document.close()
-      printWindow.print()
+const exportToExcel = () => {
+  // Backup current page and size
+  const originalPageSize = state.pageSize
+  const originalCurrentPage = state.currentPage
+
+  // Set pageSize to a large number to include all items in the export
+  state.pageSize = sortedItems.value.length
+  state.currentPage = 1
+
+  // Wait for reactivity to update the paginated items
+  setTimeout(() => {
+    if (tableData.value) {
+      const ws = XLSX.utils.aoa_to_sheet(generateExportData())
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
+      XLSX.writeFile(wb, `${props.copyTitle ?? 'Report'}.xlsx`)
+
+      // Restore original state
+      state.pageSize = originalPageSize
+      state.currentPage = originalCurrentPage
     }
+  }, 0)
+}
+
+const generateExportData = () => {
+  const headers = state.columns.map((column) => column.label)
+  const data = sortedItems.value.map((item) => {
+    return state.columns.map((column) => renderExportCellContent(item, column))
+  })
+
+  return [headers, ...data]
+}
+
+const renderExportCellContent = (item: any, column: Column) => {
+  const content = renderCellContent(item, column)
+
+  if (typeof content === 'string') {
+    return content
+  } else if (content?.component === 'router-link') {
+    return content.text
+  } else if (content?.component === 'PercentageBadge') {
+    return `${content.props.label} (${content.props.status ? '↑' : '↓'})`
+  } else if (content?.imageSrc) {
+    return content.text // Return text associated with the image for Excel
+  } else if (Array.isArray(content)) {
+    return content.map((badge) => badge.text).join(', ') // Join multiple badges
+  } else if (content?.component === 'StackedAvatar') {
+    return content.props.collections.join(', ') // Join stacked avatar data
+  } else if (content?.buttonText) {
+    return content.buttonText
+  } else {
+    return content
   }
 }
+
+// const exportToExcel = () => {
+//   if (tableData.value) {
+//     const ws = XLSX.utils.table_to_sheet(tableData.value)
+//     const wb = XLSX.utils.book_new()
+//     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
+//     XLSX.writeFile(wb, `${props.copyTitle ?? 'Report'}.xlsx`)
+//   }
+// }
+
+const printTable = () => {
+  const originalPageSize = state.pageSize
+  const originalCurrentPage = state.currentPage
+
+  const totalPages = Math.ceil(sortedItems.value.length / originalPageSize)
+
+  // Wait for reactivity to update the paginated items
+  setTimeout(() => {
+    if (tableData.value) {
+      const printWindow = window.open('', '_blank')
+      let printContent = ''
+
+      for (let i = 1; i <= totalPages; i++) {
+        state.currentPage = i
+        const pageContent = generatePrintContent()
+        printContent += `
+          <div>
+            <h3>${props.copyTitle ?? 'Print'} - Page ${i}</h3>
+            ${pageContent}
+          </div>
+          ${i < totalPages ? '<div style="page-break-after: always;"></div>' : ''}
+        `
+      }
+
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+          <head>
+            <title>${props.copyTitle ?? 'Print'}</title>
+            <style>
+              body { font-family: Arial, sans-serif; font-size: 12px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #ddd; padding: 8px; }
+              th { background-color: #f2f2f2; text-align: left; }
+              .badge { padding: 4px; font-size: 10px; }
+              @media print {
+                div { page-break-inside: avoid; }
+                table { page-break-inside: auto; }
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent}
+          </body>
+          </html>
+        `)
+        printWindow.document.close()
+        printWindow.print()
+      }
+
+      // Restore original state
+      state.pageSize = originalPageSize
+      state.currentPage = originalCurrentPage
+    }
+  }, 0)
+}
+
+const generatePrintContent = () => {
+  const tableHtml = `
+    <table>
+      <thead>
+        <tr>
+          ${state.columns.map((column) => `<th>${column.label}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${paginatedItems.value
+          .map(
+            (item) => `
+          <tr>
+            ${state.columns
+              .map(
+                (column) => `
+              <td>
+                ${renderPrintCellContent(item, column)}
+              </td>
+            `
+              )
+              .join('')}
+          </tr>
+        `
+          )
+          .join('')}
+      </tbody>
+    </table>
+  `
+  return tableHtml
+}
+
+const renderPrintCellContent = (item: any, column: Column) => {
+  const content = renderCellContent(item, column)
+
+  if (typeof content === 'string') {
+    return content
+  } else if (content?.component === 'router-link') {
+    return content.text
+  } else if (content?.component === 'PercentageBadge') {
+    return `${content.props.label} (${content.props.status ? '↑' : '↓'})`
+  } else if (content?.imageSrc) {
+    return `<img src="${content.imageSrc}" class="rounded-circle avatar-xxs me-2" /> ${content.text}`
+  } else if (Array.isArray(content)) {
+    return content
+      .map((badge) => `<span class="${badge.class}" style="${badge.style}">${badge.text}</span>`)
+      .join('')
+  } else if (content?.component === 'StackedAvatar') {
+    // Handle stacked avatar in a simple way for print, e.g., list of names or initials
+    return content.props.collections.join(', ')
+  } else if (content?.buttonText) {
+    return content.buttonText
+  } else {
+    console.log(content)
+    return content
+  }
+}
+
 onMounted(() => {
   if (loading.value) {
     setTimeout(() => {
@@ -483,7 +766,63 @@ onMounted(() => {
                   :class="column.targetCollapsed ? 'dtr-control' : ''"
                   @click="column.targetCollapsed && toggleCollapsed(index)"
                 >
-                  <template v-if="column.isNumber">
+                  <div :class="column.class">
+                    <!-- Use the slot for customizeRow -->
+                    <template v-if="column.customizeRow">
+                      <slot :name="`column-${column.name}`" :item="item" />
+                    </template>
+                    <!-- Render content based on the type returned by renderCellContent -->
+                    <template v-else>
+                      <span v-if="typeof renderCellContent(item, column) === 'string' || 'number'">
+                        {{ renderCellContent(item, column) }}
+                      </span>
+                      <router-link
+                        v-else-if="renderCellContent(item, column)?.component === 'router-link'"
+                        :to="renderCellContent(item, column).props.to"
+                      >
+                        {{ renderCellContent(item, column).text }}
+                      </router-link>
+                      <PercentageBadge
+                        v-else-if="renderCellContent(item, column)?.component === 'PercentageBadge'"
+                        :label="renderCellContent(item, column).props.label"
+                        :status="renderCellContent(item, column).props.status"
+                      />
+                      <img
+                        v-else-if="renderCellContent(item, column)?.imageSrc"
+                        :src="renderCellContent(item, column).imageSrc"
+                        class="rounded-circle avatar-xxs me-2"
+                      />
+                      <StackedAvatar
+                        v-else-if="renderCellContent(item, column)?.component === 'StackedAvatar'"
+                        :collections="renderCellContent(item, column).props.collections"
+                      />
+                      <button
+                        v-else-if="renderCellContent(item, column)?.buttonText"
+                        class="btn btn-light btn-sm"
+                        type="button"
+                        data-bs-toggle="offcanvas"
+                        data-bs-target="#offcanvasRightTrial"
+                        aria-controls="offcanvasRightTrial"
+                        @click="renderCellContent(item, column).onClick"
+                      >
+                        {{ renderCellContent(item, column).buttonText }}
+                      </button>
+                      <template v-else-if="Array.isArray(renderCellContent(item, column))">
+                        <span
+                          v-for="badge in renderCellContent(item, column)"
+                          :key="badge.text"
+                          :class="badge.class"
+                          :style="badge.style"
+                        >
+                          {{ badge.text }}
+                        </span>
+                      </template>
+                      <span v-else>
+                        {{ renderCellContent(item, column)?.text }}
+                      </span>
+                    </template>
+                  </div>
+                  <!-- <template v-if="column.isNumber">
                     <div :class="column.class">
                       <span style="float: left" v-if="column.currency">{{ column.currency }}</span>
                       {{
@@ -780,12 +1119,13 @@ onMounted(() => {
                   <template v-else-if="column.defaultValue">
                     {{ getObjectValue(item, column.name, column.defaultValue) }}
                   </template>
-                  <template v-else-if="column.customizeRow">
+                  <template v-if="column.customizeRow">
                     <slot :name="`column-${column.name}`" :item="item" />
                   </template>
                   <template v-else>
                     {{ getObjectValue(item, column.name) }}
-                  </template>
+                    {{ renderCellContent(item, column) }}
+                  </template> -->
                 </td>
               </tr>
               <tr

@@ -134,8 +134,17 @@ const columns = [
     label: 'Staff',
     sortable: true,
     filterable: true,
-    class: 'fw-bolder',
+    class: 'text-info',
     headerClass: 'text-warning'
+  },
+  {
+    name: 'id',
+    label: 'Number',
+    isNumber: true,
+    sortable: true,
+    filterable: true,
+    class: 'text-center',
+    headerClass: 'text-info'
   },
   {
     name: 'phone',
@@ -148,8 +157,7 @@ const columns = [
     name: 'email',
     label: 'Email',
     sortable: true,
-    filterable: true,
-    class: 'fw-bolder'
+    filterable: true
   },
   {
     name: 'custom',
@@ -163,34 +171,37 @@ const columns = [
 
 <template>
   <header>
-    <div class="wrapper">
-      <h3>Datatable Client</h3>
-      <datatable-client
-        :dataTable="dataTables"
-        :column="columns"
-        :buttons="{ copy: true, excel: false, print: true }"
-        collapsed
-      >
-        <template #column-custom="{ item }">
-          <span class="badge bg-success-subtle text-success">{{ item.name }}</span>
-        </template>
-        <template #childCollapsed="{ item }">
-          <ul class="dtr-details">
-            <li>
-              <span class="dtr-title">Name</span>
-              <span class="dtr-data">{{ item.name }}</span>
-            </li>
-            <li>
-              <span class="dtr-title">Value</span>
-              <span class="dtr-data">{{ item.phone }}</span>
-            </li>
-            <li>
-              <span class="dtr-title">Message</span>
-              <span class="dtr-data">{{ item.email }}</span>
-            </li>
-          </ul>
-        </template>
-      </datatable-client>
+    <div class="container">
+      <div class="card">
+        <h3>Datatable Client</h3>
+        <datatable-client
+          :dataTable="dataTables"
+          :column="columns"
+          :buttons="{ copy: true, excel: true, print: true }"
+          copyTitle="Test Copy"
+          collapsed
+        >
+          <template #column-custom="{ item }">
+            <span class="badge bg-success-subtle text-success">{{ item.name }}</span>
+          </template>
+          <template #childCollapsed="{ item }">
+            <ul class="dtr-details">
+              <li>
+                <span class="dtr-title">Name</span>
+                <span class="dtr-data">{{ item.name }}</span>
+              </li>
+              <li>
+                <span class="dtr-title">Phone</span>
+                <span class="dtr-data">{{ item.phone }}</span>
+              </li>
+              <li>
+                <span class="dtr-title">Email</span>
+                <span class="dtr-data">{{ item.email }}</span>
+              </li>
+            </ul>
+          </template>
+        </datatable-client>
+      </div>
     </div>
   </header>
 </template>
