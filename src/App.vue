@@ -170,40 +170,48 @@ const columns = [
 </script>
 
 <template>
-  <header>
+  <body>
     <div class="container">
-      <div class="card">
-        <h3>Datatable Client</h3>
-        <datatable-client
-          :dataTable="dataTables"
-          :column="columns"
-          :buttons="{ copy: true, excel: true, print: true }"
-          copyTitle="Test Copy"
-          collapsed
-        >
-          <template #column-custom="{ item }">
-            <span class="badge bg-success-subtle text-success">{{ item.name }}</span>
-          </template>
-          <template #childCollapsed="{ item }">
-            <ul class="dtr-details">
-              <li>
-                <span class="dtr-title">Name</span>
-                <span class="dtr-data">{{ item.name }}</span>
-              </li>
-              <li>
-                <span class="dtr-title">Phone</span>
-                <span class="dtr-data">{{ item.phone }}</span>
-              </li>
-              <li>
-                <span class="dtr-title">Email</span>
-                <span class="dtr-data">{{ item.email }}</span>
-              </li>
-            </ul>
-          </template>
-        </datatable-client>
+      <div class="row m-4">
+        <div class="col">
+          <div class="card p-2">
+            <div class="card-title mb-0">
+              <h3>Datatable Client</h3>
+            </div>
+            <div class="card-body">
+              <datatable-client
+                :dataTable="dataTables"
+                :column="columns"
+                :buttons="{ copy: true, excel: true, print: true }"
+                copyTitle="Test Copy"
+                collapsed
+              >
+                <template #column-custom="{ item }">
+                  <span class="badge bg-success-subtle text-success">{{ item.name }}</span>
+                </template>
+                <template #childCollapsed="{ item }">
+                  <ul class="dtr-details">
+                    <li>
+                      <span class="dtr-title">Name</span>
+                      <span class="dtr-data">{{ item.name }}</span>
+                    </li>
+                    <li>
+                      <span class="dtr-title">Phone</span>
+                      <span class="dtr-data">{{ item.phone }}</span>
+                    </li>
+                    <li>
+                      <span class="dtr-title">Email</span>
+                      <span class="dtr-data">{{ item.email }}</span>
+                    </li>
+                  </ul>
+                </template>
+              </datatable-client>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </header>
+  </body>
 </template>
 
 <style></style>

@@ -512,15 +512,6 @@ const renderExportCellContent = (item: any, column: Column) => {
   }
 }
 
-// const exportToExcel = () => {
-//   if (tableData.value) {
-//     const ws = XLSX.utils.table_to_sheet(tableData.value)
-//     const wb = XLSX.utils.book_new()
-//     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
-//     XLSX.writeFile(wb, `${props.copyTitle ?? 'Report'}.xlsx`)
-//   }
-// }
-
 const printTable = () => {
   const originalPageSize = state.pageSize
   const originalCurrentPage = state.currentPage
@@ -645,7 +636,6 @@ onMounted(() => {
   }
 })
 </script>
-
 <template>
   <div class="dataTables_wrapper dt-bootstrap5 no-footer">
     <div class="row">

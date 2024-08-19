@@ -7,3 +7,5 @@ export default {
     app.provide('asset_url', options.asset_url)
   }
 }
+
+export { DatatableClient }
