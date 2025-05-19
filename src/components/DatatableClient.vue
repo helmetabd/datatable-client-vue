@@ -27,7 +27,7 @@ import PercentageBadge from './percentage-badge.vue'
 import thousandSeparator from '../utils/thousandSeparator'
 import { getAvatar } from '../utils/assetsHelper.js'
 import { calculateGrowth } from '../utils/calculationHelper.js'
-import type { Column, FormField, Props } from '@/interfaces'
+import type { Column, FormField, Props, RenderColumn } from '@/interfaces'
 
 const url = inject('asset_url') as string
 
@@ -63,7 +63,13 @@ const state = reactive({
 
 const isDataEmpty = ref(false)
 
-const loading = computed(() => filteredItems.value?.length === 0)
+const loading = computed(() => {
+  if (filteredItems.value.length === 0) {
+    return true
+  } else {
+    return false
+  }
+})
 
 const filteredItems = computed(() => {
   if (!state.filter) {
@@ -107,7 +113,7 @@ const totalPages = computed(() => {
 const paginatedItems = computed(() => {
   const start = (state.currentPage - 1) * state.pageSize
   const end = start + state.pageSize
-  return sortedItems.value.slice(start, end)
+  return sortedItems.value.length ? sortedItems.value.slice(start, end) : []
 })
 
 const pages = computed(() => {
@@ -131,19 +137,48 @@ const entriesRange = computed(() => {
 })
 
 const ellipsisPages = computed(() => {
-  const visiblePages = 5
-  let start = state.currentPage - Math.floor(visiblePages / 2)
-  start = Math.max(start, 1)
-  let end = start + visiblePages - 1
-  if (end > totalPages.value) {
+  const totalVisiblePages = 3
+  let range = []
+  let start, end
+
+  if (totalPages.value <= totalVisiblePages) {
+    start = 1
     end = totalPages.value
-    start = Math.max(end - visiblePages + 1, 1)
+  } else {
+    const pagesBeforeCurrent = 1
+    const pagesAfterCurrent = 1
+
+    if (state.currentPage <= pagesBeforeCurrent + 1) {
+      start = 1
+      end = totalVisiblePages
+    } else if (state.currentPage + pagesAfterCurrent >= totalPages.value) {
+      start = totalPages.value - totalVisiblePages + 1
+      end = totalPages.value
+    } else {
+      start = state.currentPage - pagesBeforeCurrent
+      end = state.currentPage + pagesAfterCurrent
+    }
   }
-  return {
-    start,
-    end,
-    range: Array.from({ length: end - start + 1 }, (_: any, i: number) => start + i)
+
+  if (start > 1) {
+    range.push(1)
+    if (start > 2) {
+      range.push('...')
+    }
   }
+
+  for (let i = start; i <= end; i++) {
+    range.push(i)
+  }
+
+  if (end < totalPages.value) {
+    if (end < totalPages.value - 1) {
+      range.push('...')
+    }
+    range.push(totalPages.value)
+  }
+
+  return { start, end, range }
 })
 
 const avatar = (avatar: string | string[]) => getAvatar(avatar, url)
@@ -244,15 +279,49 @@ const toggleCollapsed = (id: string | number) => {
   }
 }
 
+function lightOrDark(color: any | any[]) {
+  // Check the format of the color, HEX or RGB?
+  let r, g, b, hsp
+  if (color.match(/^rgb/)) {
+    // If HEX --> store the red, green, blue values in separate variables
+    color = color.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)$/);
+    r = color[1];
+    g = color[2];
+    b = color[3];
+  }
+  else {
+    // If RGB --> Convert it to HEX: http://gist.github.com/983661
+    color = +("0x" + color.slice(1).replace(
+      color.length < 5 && /./g, '$&$&'
+    ));
+    r = color >> 16;
+    g = color >> 8 & 255;
+    b = color & 255;
+  }
+  // HSP equation from http://alienryderflex.com/hsp.html
+  hsp = Math.sqrt(
+    0.299 * (r * r) +
+    0.587 * (g * g) +
+    0.114 * (b * b)
+  );
+  // Using the HSP value, determine whether the color is light or dark
+  if (hsp > 127.5) {
+    return 'light';
+  }
+  else {
+    return 'dark';
+  }
+}
+
 const tableData = ref<HTMLElement | null>(null)
 const copyInfo = ref<HTMLElement | null>(null)
 
 const renderCellContent = (item: any, column: Column) => {
   if (column.isNumber) {
     const value = getObjectValue(item, column.name)
-    const formattedValue = column.fixedNumber
+    const formattedValue = value ? column.fixedNumber
       ? value?.toFixed(column.fixedNumber).replace('.', ',')
-      : thousandSeparator(value)
+      : thousandSeparator(value) : 0
     return formattedValue
   } else if (column.percentage) {
     const growth = calculateGrowth(
@@ -267,8 +336,9 @@ const renderCellContent = (item: any, column: Column) => {
       }
     }
   } else if (column.custom) {
-    let returnData: { text: string, component?: string, props?: any, imageSrc?: string, iconClass?: string, uniqueFirst?: string } = { text: getObjectValue(item, column.custom.display ?? column.name) }
+    let returnData = { text: getObjectValue(item, column.custom.display ?? column.name) } as RenderColumn
     if (column.custom.routeName) {
+      const valueColumn = getObjectValue(item, column.name)
       returnData = {
         ...returnData,
         component: 'router-link',
@@ -277,10 +347,10 @@ const renderCellContent = (item: any, column: Column) => {
             name: column.custom.routeName,
             params: {
               id: column.isFirst
-                ? getObjectValue(item[column.name][0], column.custom.params)
+                ? getObjectValue(valueColumn[0], column.custom.params)
                 : column.isLast
                   ? getObjectValue(
-                    item[column.name][item[column.name].length - 1],
+                    valueColumn[valueColumn.length - 1],
                     column.custom.params
                   )
                   : getObjectValue(item, column.custom.params)
@@ -294,55 +364,39 @@ const renderCellContent = (item: any, column: Column) => {
     }
     if (column.custom.icon) {
       returnData.iconClass = column.custom.icon
+      if (column.custom.iconColorObject) {
+        returnData.iconColorObject = getObjectValue(item, column.custom.iconColorObject)
+      }
+      if (column.custom.iconColor) {
+        returnData.iconColor = column.custom.iconColor
+      }
     }
     if (column.custom.uniqueFirst && getObjectValue(item, column.custom.uniqueFirst.fields) === column.custom.uniqueFirst.value) {
       returnData.uniqueFirst = column.custom.uniqueFirst.icon
     }
+    if (column.custom.parent && getObjectValue(item, column.custom.parent.data) !== null && getObjectValue(item, column.custom.parent.params) !== getObjectValue(item, column.custom.params)) {
+      returnData.parent.props.to = {
+        name: column.custom.parent.routeName,
+        params: {
+          id: getObjectValue(item, column.custom.parent.params)
+        }
+      }
+      returnData.parent.text = getObjectValue(item, column.custom.parent.name)
+      if (column.custom.parent.icon) {
+        returnData.parent.iconClass = column.custom.parent.icon
+      } else {
+        returnData.parent.iconClass = column.custom.icon
+      }
+      if (column.custom.parent.iconColorObject) {
+        returnData.parent.iconColorObject = getObjectValue(item, column.custom.parent.iconColorObject)
+      }
+      if (column.custom.parent.iconColor) {
+        returnData.parent.iconColor = column.custom.parent.iconColor
+      }
+    }
+    // console.log(returnData)
     return returnData
   } else if (column.badge) {
-    // if (column.badge?.types) {
-    //   const value = getObjectValue(item, column.name)
-    //   if (Array.isArray(value)) {
-    //     // Case 1: When the data is an array
-    //     const badges = value.map((arrayItem: any) =>
-    //       column.badge.types
-    //         .filter((model: any) => model.value === getObjectValue(arrayItem, column.badge.display))
-    //         .map((model: any) => ({
-    //           class: column.badge.custom
-    //             ? `badge text-${model.textColor}`
-    //             : `badge bg-${model.type}-subtle text-${model.type} p-2`,
-    //           style: column.badge.custom ? `background-color: ${model.color};` : '',
-    //           text: model.label || getObjectValue(arrayItem, column.badge.display),
-    //         }))
-    //     );
-    //     return badges.flat(); // Flatten the array to return a single list of badges
-    //   } else {
-    //     // Case 2: When the data is not an array (use column.name directly)
-    //     const badges = column.badge.types
-    //       .filter((model: any) => model.value === value)  // Non-array, direct comparison
-    //       .map((model: any) => ({
-    //         class: column.badge.custom
-    //           ? `badge text-${model.textColor}`
-    //           : `badge bg-${model.type}-subtle text-${model.type} p-2`,
-    //         style: column.badge.custom ? `background-color: ${model.color};` : '',
-    //         text: model.label || value,
-    //       }));
-    //     return badges;
-    //   }
-    // } else if (column.badge?.custom) {
-    //   return {
-    //     condition: true,
-    //     class: `badge text-${column.badge.textColor}`,
-    //     style: `background-color: ${getObjectValue(item, column.badge.color)};`,
-    //     text: getObjectValue(item, column.badge.display),
-    //   };
-    // } else if (!column.badge.types && !column.badge.custom) {
-    //   return {
-    //     condition: true,
-    //     class: `badge bg-${column.badge.type}-subtle text-${column.badge.type} p-2`,
-    //     text: getObjectValue(item, column.name),
-    //   };
-    // }
     const columnValue = getObjectValue(item, column.name)
     const generateBadge = (value: any) => ({
       class: `badge bg-${column.badge?.type || 'default'}-subtle text-${column.badge?.textColor || 'default'} p-2`,
@@ -411,26 +465,36 @@ const renderCellContent = (item: any, column: Column) => {
     return formattedDate
   } else if (column.offcanvas) {
     return {
-      buttonText: item[column.name],
+      buttonText: getObjectValue(item, column.name),
       onClick: () =>
         openOffcanvas({
           courier: getObjectValue(item, column.offcanvas.courier),
-          tracking_number: item[column.name]
+          tracking_number: getObjectValue(item, column.name)
         })
     }
   } else if (column.stackedImage) {
     return {
       component: 'StackedAvatar',
-      props: { collections: item[column.name] }
+      props: { collections: getObjectValue(item, column.name) }
     }
   } else if (column.isArray) {
+    const columnValue = getObjectValue(item, column.name)
     return column.isFirst
-      ? getObjectValue(item[column.name][0], column.display)
+      ? getObjectValue(columnValue[0], column.display)
       : column.isLast
-        ? getObjectValue(item[column.name][item[column.name].length - 1], column.display)
-        : formatObjectArray(item[column.name], column.display)
+        ? getObjectValue(columnValue[columnValue.length - 1], column.display)
+        : formatObjectArray(columnValue, column.display)
   } else if (column.defaultValue) {
     return getObjectValue(item, column.name, column.defaultValue)
+  } else if (column.color) {
+    const colorValue = getObjectValue(item, column.name)
+    return {
+      component: 'ColorDiv',
+      props: {
+        textColor: lightOrDark(colorValue) == 'light' ? 'text-dark' : 'text-light',
+        text: colorValue
+      }
+    }
   } else if (column.customizeRow) {
     // Customization handled by the slot in the template
     return null
@@ -497,11 +561,16 @@ const generateExportData = () => {
 
 const renderExportCellContent = (item: any, column: Column) => {
   const content = renderCellContent(item, column)
+  // console.log(content)
 
   if (typeof content === 'string') {
     return content
   } else if (content?.component === 'router-link') {
-    return content.text
+    if (content?.parent) {
+      return `${content.parent.text} &rarr; ${content.text}`
+    } else {
+      return content.text
+    }
   } else if (content?.component === 'PercentageBadge') {
     return `${content.props.label} (${content.props.status ? '↑' : '↓'})`
   } else if (content?.imageSrc) {
@@ -512,6 +581,12 @@ const renderExportCellContent = (item: any, column: Column) => {
     return content.props.collections.join(', ') // Join stacked avatar data
   } else if (content?.buttonText) {
     return content.buttonText
+  } else if (typeof content == 'object' && content !== null) {
+    if (content?.parent) {
+      return `${content.parent.text} &rarr; ${content.text}`
+    } else {
+      return content.text
+    }
   } else {
     return content
   }
@@ -612,7 +687,11 @@ const renderPrintCellContent = (item: any, column: Column) => {
   if (typeof content === 'string') {
     return content
   } else if (content?.component === 'router-link') {
-    return content.text
+    if (content?.parent) {
+      return `${content.parent.text} &rarr; ${content.text}`
+    } else {
+      return content.text
+    }
   } else if (content?.component === 'PercentageBadge') {
     return `${content.props.label} (${content.props.status ? '↑' : '↓'})`
   } else if (content?.imageSrc) {
@@ -626,8 +705,13 @@ const renderPrintCellContent = (item: any, column: Column) => {
     return content.props.collections.join(', ')
   } else if (content?.buttonText) {
     return content.buttonText
+  } else if (typeof content === 'object' && content !== null) {
+    if (content?.parent) {
+      return `${content.parent.text} &rarr; ${content.text}`
+    } else {
+      return content.text
+    }
   } else {
-    console.log(content)
     return content
   }
 }
@@ -637,13 +721,13 @@ onMounted(() => {
     setTimeout(() => {
       isDataEmpty.value = true
       loadingState.value = false
-    }, 6000)
+    }, 3000)
   }
 })
 </script>
 <template>
   <div class="dataTables_wrapper dt-bootstrap5 no-footer">
-    <div class="row">
+    <div class="row ">
       <div class="col-sm-12 col-md-6">
         <div class="dataTables_length" v-if="props.table_show">
           <label>
@@ -666,21 +750,21 @@ onMounted(() => {
       </div>
     </div>
     <div class="row">
-      <div class="col-sm-12">
-        <div class="dt-buttons" v-if="props.buttons">
-          <button v-if="props.buttons.copy" class="dt-button buttons-copy buttons-html5" tabindex="0" type="button"
-            id="copyButton" @click="copyToClipboard">
-            <span>Copy</span>
-          </button>
-          <button v-if="props.buttons.excel" class="dt-button buttons-excel buttons-html5" tabindex="0" type="button"
-            @click="exportToExcel">
-            <span>Excel</span>
-          </button>
-          <button v-if="props.buttons.print" class="dt-button buttons-print" tabindex="0" type="button"
-            @click="printTable">
-            <span>Print</span>
-          </button>
-        </div>
+      <div class="dt-buttons" v-if="props.buttons">
+        <button v-if="props.buttons.copy" class="dt-button buttons-copy buttons-html5" tabindex="0" type="button"
+          id="copyButton" @click="copyToClipboard">
+          <span>Copy</span>
+        </button>
+        <button v-if="props.buttons.excel" class="dt-button buttons-excel buttons-html5" tabindex="0" type="button"
+          @click="exportToExcel">
+          <span>Excel</span>
+        </button>
+        <button v-if="props.buttons.print" class="dt-button buttons-print" tabindex="0" type="button"
+          @click="printTable">
+          <span>Print</span>
+        </button>
+      </div>
+      <div style="overflow-x: auto; overflow-y: hidden;">
         <table ref="tableData" id="datatable"
           class="table table-hover table-bordered align-middle text-nowrap dt-responsive nowrap no-footer dataTable"
           :class="props.collapsed ? 'dtr-inline collapsed' : props.table_class" style="width: 100%"
@@ -709,7 +793,7 @@ onMounted(() => {
                 : ''
                 ">
                 <td v-for="(column, columnIndex) in state.columns" :key="columnIndex"
-                  :class="column.targetCollapsed ? 'dtr-control' : ''"
+                  :class="column.targetCollapsed ? 'dtr-control' : '' + column.bold ? 'fw-semibold ' : 'fw-normal '"
                   @click="column.targetCollapsed && toggleCollapsed(index)" :hidden="column.hidden ?? false">
                   <div :class="column.class">
                     <!-- Use the slot for customizeRow -->
@@ -726,19 +810,40 @@ onMounted(() => {
                       <PercentageBadge v-else-if="renderCellContent(item, column)?.component === 'PercentageBadge'"
                         :label="renderCellContent(item, column).props.label"
                         :status="renderCellContent(item, column).props.status" />
-                      <router-link v-else-if="renderCellContent(item, column)?.component === 'router-link'"
-                        :to="renderCellContent(item, column).props.to">
-                        <img v-if="renderCellContent(item, column)?.imageSrc"
-                          :src="renderCellContent(item, column).imageSrc" class="rounded-circle avatar-xxs me-2" />
-                        <i v-if="renderCellContent(item, column)?.iconClass"
-                          :class="renderCellContent(item, column)?.iconClass"></i>
-                        {{ renderCellContent(item, column).text }}
-                        <i v-if="renderCellContent(item, column)?.uniqueFirst"
-                          :class="renderCellContent(item, column)?.uniqueFirst"></i>
-                        <template v-if="column.custom.uniqueIcon">
-                          <slot :name="`column-${column.name}-unique`" :item="item" />
+                      <template v-else-if="renderCellContent(item, column)?.component === 'router-link'">
+                        <template v-if="renderCellContent(item, column)?.parent">
+                          <router-link :to="renderCellContent(item, column).parent.props.to">
+                            <i v-if="renderCellContent(item, column)?.parent?.iconClass"
+                              :class="renderCellContent(item, column).parent.iconClass" :style="renderCellContent(item, column)?.parent?.iconColorObject ? 'color: ' +
+                                renderCellContent(item, column).parent.iconColorObject +
+                                ';'
+                                : renderCellContent(item, column)?.parent?.iconColor
+                                  ? 'color: ' + renderCellContent(item, column).parent.iconColor + ';'
+                                  : null
+                                "></i>
+                            {{ renderCellContent(item, column).parent.text }}
+                          </router-link>
+                          <i class="las la-arrow-right ms-1 me-1 text-muted"></i>
                         </template>
-                      </router-link>
+                        <router-link :to="renderCellContent(item, column).props.to">
+                          <img v-if="renderCellContent(item, column)?.imageSrc"
+                            :src="renderCellContent(item, column).imageSrc" class="rounded-circle avatar-xxs me-2" />
+                          <i v-if="renderCellContent(item, column)?.iconClass"
+                            :class="renderCellContent(item, column)?.iconClass" :style="renderCellContent(item, column)?.iconColorObject ? 'color: ' +
+                              renderCellContent(item, column)?.iconColorObject +
+                              ';'
+                              : renderCellContent(item, column)?.iconColor
+                                ? 'color: ' + renderCellContent(item, column)?.iconColor + ';'
+                                : null
+                              "></i>
+                          {{ renderCellContent(item, column).text }}
+                          <i v-if="renderCellContent(item, column)?.uniqueFirst"
+                            :class="renderCellContent(item, column)?.uniqueFirst"></i>
+                          <template v-if="column.custom.uniqueIcon">
+                            <slot :name="`column-${column.name}-unique`" :item="item" />
+                          </template>
+                        </router-link>
+                      </template>
                       <StackedAvatar v-else-if="renderCellContent(item, column)?.component === 'StackedAvatar'"
                         :collections="renderCellContent(item, column).props.collections" />
                       <button v-else-if="renderCellContent(item, column)?.buttonText" class="btn btn-light btn-sm"
@@ -756,6 +861,13 @@ onMounted(() => {
                         :class="renderCellContent(item, column).class" :style="renderCellContent(item, column).style">
                         {{ renderCellContent(item, column).text }}
                       </span>
+                      <div v-else-if="renderCellContent(item, column)?.component === 'ColorDiv'">
+                        <div :style="{ backgroundColor: renderCellContent(item, column).text }" class="p-1 rounded-2">
+                          <span :class="renderCellContent(item, column).textColor">
+                            {{ renderCellContent(item, column).text }}
+                          </span>
+                        </div>
+                      </div>
                       <span v-else>
                         <img v-if="renderCellContent(item, column)?.imageSrc"
                           :src="renderCellContent(item, column).imageSrc" class="rounded-circle avatar-xxs me-2" />
@@ -793,7 +905,8 @@ onMounted(() => {
     </div>
     <div class="row">
       <div class="col-sm-12 col-md-5" v-if="props.table_pagination">
-        <div class="dataTables_info" id="datatable_info" role="status" aria-live="polite">
+        <div class="dataTables_info" id="datatable_info" role="status" aria-live="polite"
+          :class="props.paginationClass">
           <span class="page-stats">Showing {{ entriesRange }} entries</span>
         </div>
       </div>
@@ -817,33 +930,18 @@ onMounted(() => {
               </li>
             </template>
             <template v-else>
-              <li v-if="ellipsisPages.start > 1" class="paginate_button page-item">
-                <button @click="goToPage(1)" class="page-link" data-dt-idx="2" tabindex="0"
-                  :class="{ active: 1 === state.currentPage }"
-                  :style="'cursor:' + (1 === state.currentPage ? ' default;' : ' pointer;')">
-                  1
-                </button>
-              </li>
-              <li v-if="ellipsisPages.start > 1">
-                <span class="page-link">...</span>
-              </li>
-              <li class="paginate_button page-item" v-for="pageNumber in ellipsisPages.range" :key="pageNumber">
-                <button @click="goToPage(pageNumber)" class="page-link" data-dt-idx="2" tabindex="0"
-                  :class="{ active: pageNumber === state.currentPage }" :style="'cursor:' + (pageNumber === state.currentPage ? ' default;' : ' pointer;')
-                    ">
-                  {{ pageNumber }}
-                </button>
-              </li>
-              <li v-if="ellipsisPages.end < totalPages">
-                <span class="page-link" style="pointer-events: none">...</span>
-              </li>
-              <li v-if="ellipsisPages.end < totalPages" class="paginate_button page-item">
-                <button @click="goToPage(totalPages)" class="page-link" data-dt-idx="2" tabindex="0"
-                  :class="{ active: totalPages === state.currentPage }" :style="'cursor:' + (totalPages === state.currentPage ? ' default;' : ' pointer;')
-                    ">
-                  {{ totalPages }}
-                </button>
-              </li>
+              <template v-for="pageNumber in ellipsisPages.range" :key="pageNumber">
+                <li class="paginate_button page-item" v-if="pageNumber !== '...'">
+                  <button v-if="typeof pageNumber == 'number'" @click="goToPage(pageNumber)" class="page-link"
+                    data-dt-idx="2" tabindex="0" :class="{ active: pageNumber === state.currentPage }" :style="'cursor:' + (pageNumber === state.currentPage ? ' default;' : ' pointer;')
+                      ">
+                    {{ pageNumber }}
+                  </button>
+                </li>
+                <li v-else>
+                  <span class="page-link" style="pointer-events: none">...</span>
+                </li>
+              </template>
             </template>
             <li class="paginate_button page-item next">
               <button @click="nextPage" class="page-link" data-dt-idx="8" tabindex="0"

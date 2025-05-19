@@ -33,6 +33,7 @@ export interface Column {
   defaultValue?: any
   display?: string
   customizeRow?: boolean
+  color?: boolean
   params?: { id: string; date: any }
 }
 
@@ -65,6 +66,18 @@ export interface Props {
   copyTitle?: string
   headerRowClass?: string
   paginationClass?: string
+}
+
+export interface RenderColumn {
+  text: string
+  component?: string
+  props?: any
+  imageSrc?: string
+  iconClass?: string
+  uniqueFirst?: string
+  iconColorObject?: string
+  iconColor?: string
+  parent?: RenderColumn
 }
 
 export interface FormField {

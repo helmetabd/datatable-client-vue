@@ -8,11 +8,12 @@ File: Custom Css File
 
 .flatpickr-calendar {
   background-color: var(--#{$prefix}secondary-bg) !important;
-  box-shadow: 1px 0 0 var(--#{$prefix}border-color),
-  -1px 0 0 var(--#{$prefix}border-color),
-  0 1px 0 var(--#{$prefix}border-color),
-  0 -1px 0 var(--#{$prefix}border-color),
-  0 3px 13px rgba(0, 0, 0, 0.08) !important;
+  box-shadow:
+    1px 0 0 var(--#{$prefix}border-color),
+    -1px 0 0 var(--#{$prefix}border-color),
+    0 1px 0 var(--#{$prefix}border-color),
+    0 -1px 0 var(--#{$prefix}border-color),
+    0 3px 13px rgba(0, 0, 0, 0.08) !important;
 
   &.hasTime .flatpickr-time {
     height: 40px;
@@ -70,7 +71,6 @@ File: Custom Css File
 
   input,
   .flatpickr-am-pm {
-
     &:hover,
     &:focus {
       background: rgba($primary, 0.04) !important;
@@ -79,7 +79,6 @@ File: Custom Css File
 }
 
 .flatpickr-months {
-
   .flatpickr-prev-month,
   .flatpickr-next-month {
     color: rgba($white, 0.9) !important;
@@ -218,7 +217,6 @@ File: Custom Css File
 
 .flatpickr-calendar {
   .flatpickr-current-month {
-
     .flatpickr-monthDropdown-months,
     input.cur-year {
       color: $white !important;
@@ -344,13 +342,12 @@ File: Custom Css File
   }
 
   .mdi-checkbox-blank-circle::before {
-    content: "" !important;
+    content: '' !important;
   }
 }
 
 //mailbox
 .fc-media-screen {
-
   .fc-h-event,
   .fc-v-event {
     border: none;
@@ -613,7 +610,7 @@ File: Custom Css File
   }
 
   .card-number {
-    font-family: "Bitstream Vera Sans Mono", Consolas, Courier, monospace;
+    font-family: 'Bitstream Vera Sans Mono', Consolas, Courier, monospace;
     font-size: 24px !important;
     clear: both;
     margin-bottom: -8px;
@@ -634,5 +631,194 @@ File: Custom Css File
 .b-overlay {
   div.bg-dark {
     opacity: 0.55 !important;
+  }
+}
+
+input[type='checkbox'] {
+  cursor: pointer;
+}
+
+.custom-tooltip {
+  --bs-tooltip-bg: var(--vz-danger-bg-subtle);
+  --bs-tooltip-color: var(--vz-danger-text-emphasis);
+}
+
+.link {
+  cursor: pointer;
+  color: #364574;
+}
+.link:hover,
+a:hover {
+  color: #2385ba;
+}
+
+.dashboard-padding {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.navbar-menu .navbar-nav .nav-link {
+  font-size: inherit;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.table {
+  width: 100% !important;
+}
+
+.sales-new-icon {
+  position: fixed;
+  bottom: 70px;
+  left: 20px;
+  z-index: 1000;
+}
+
+.dtr-details {
+  width: 100% !important;
+}
+
+.dtr-data,
+.dtr-title {
+  width: 50% !important;
+}
+
+table.dataTable > tbody > tr.child ul.dtr-details > li {
+  border: none;
+}
+
+.dataTables_info {
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 99;
+}
+
+.show-xs {
+  display: none;
+}
+
+@media (max-width: 481px) {
+  body {
+    font-size: 0.75rem;
+  }
+
+  .show-xs {
+    display: block !important;
+  }
+
+  .hide-xs,
+  .dtr-title {
+    display: none !important;
+  }
+
+  .col-lg-12,
+  .max-xs {
+    padding: 0 !important;
+  }
+
+  .dataTables_filter {
+    text-align: left !important;
+    padding-left: 15px !important;
+  }
+
+  .dataTables_length,
+  .dataTables_info {
+    display: none;
+  }
+
+  div.col-sm-12.col-md-5 {
+    display: none;
+  }
+
+  .dataTables_paginate {
+    float: left !important;
+    margin-top: 25px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  div.dataTables_paginate > ul.pagination > li > button.page-link {
+    font-size: 8px;
+  }
+
+  div.paginationWrapper {
+    justify-content: center !important;
+    flex-wrap: wrap;
+    columns: auto;
+  }
+
+  .dataTables_wrapper .col-md-7,
+  .dataTables_wrapper .col-md-6 {
+    padding-left: 0px !important;
+  }
+
+  .project-stat-title {
+    float: right;
+    font-size: 8px;
+  }
+
+  .project-stat-box {
+    padding-top: 15px;
+  }
+}
+
+@media (max-width: 800px) {
+  dataTables_filter {
+    text-align: left !important;
+  }
+
+  .dataTables_length,
+  .dataTables_info {
+    display: none;
+  }
+
+  .dataTables_wrapper .col-md-7,
+  .dataTables_wrapper .col-md-6 {
+    padding-left: 0px !important;
+  }
+}
+
+[data-layout='vertical'][data-sidebar-size='sm'] {
+  @media (min-width: 768px) {
+    min-height: 100vh !important;
+  }
+}
+
+.big-font {
+  font-size: calc(1.375rem + 0.9vw);
+  @media (min-width: 1280px) {
+    font-size: calc(1.375rem + 0.9vw);
+  }
+  @media (min-width: 1440px) {
+    font-size: calc(1.5rem + 1.5vw);
+  }
+}
+
+.semi-font {
+  font-size: calc(1.125rem + 0.6vw);
+
+  @media (min-width: 1280px) {
+    font-size: calc(1.125rem + 0.6vw);
+  }
+  @media (min-width: 1440px) {
+    font-size: calc(1.25rem + 0.9vw);
+  }
+}
+
+.title-font {
+  font-size: calc(1rem);
+
+  @media (min-width: 1280px) {
+    font-size: calc(1rem);
+  }
+  @media (min-width: 1440px) {
+    font-size: calc(1.375rem);
   }
 }

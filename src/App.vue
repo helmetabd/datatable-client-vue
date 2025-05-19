@@ -177,7 +177,7 @@ const columns = [
   },
   {
     name: 'id',
-    label: 'Number',
+    label: 'Sallary',
     currency: 'Rp',
     isNumber: true,
     sortable: true,
